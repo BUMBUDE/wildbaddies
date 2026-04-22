@@ -1,4 +1,5 @@
 import { Eye, Star } from "lucide-react";
+import { Link } from "react-router-dom";
 import poster from "@/assets/video-placeholder.jpg";
 
 interface VideoCardProps {
@@ -9,8 +10,9 @@ interface VideoCardProps {
 }
 
 const VideoCard = ({ title, duration, views, rating }: VideoCardProps) => {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "video";
   return (
-    <article className="group flex flex-col gap-3">
+    <Link to={`/video/${slug}`} className="group flex flex-col gap-3">
       <div className="relative overflow-hidden rounded-lg bg-secondary aspect-video">
         <img
           src={poster}
@@ -35,7 +37,7 @@ const VideoCard = ({ title, duration, views, rating }: VideoCardProps) => {
           </span>
         </div>
       </div>
-    </article>
+    </Link>
   );
 };
 
