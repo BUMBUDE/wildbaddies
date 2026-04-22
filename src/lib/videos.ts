@@ -54,11 +54,14 @@ export const getVideoBySlug = async (slug: string): Promise<VideoRecord | null> 
   return data as VideoRecord | null;
 };
 
-export const registerBunnyVideo = async (videoId: string, title?: string) => {
+export const uploadVideo = async (title: string, file: File) => {
   const client = ensureSupabase();
+  const formData = new FormData();
+  formData.set("title", title);
+  formData.set("file", file);
 
   const { data, error } = await client.functions.invoke("create-video", {
-    body: { videoId, title },
+    body: formData,
   });
 
   if (error) {

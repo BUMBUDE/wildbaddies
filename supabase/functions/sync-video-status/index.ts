@@ -27,6 +27,43 @@ type BunnyVideoResponse = {
   thumbnailFileName?: string | null;
 };
 
+const extractWebhookVideoId = async (req: Request): Promise<string | null> => {
+  const url = new URL(req.url);
+  const fromQuery = url.searchParams.get("videoId") ?? url.searchParams.get("guid");
+  if (fromQuery) {
+    return fromQuery;
+  }
+
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
+
+  const payload = await req.json().catch(() => null);
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const direct =
+    (payload as Record<string, unknown>).videoId ??
+    (payload as Record<string, unknown>).guid;
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+
+  const videoObj = (payload as Record<string, unknown>).video;
+  if (videoObj && typeof videoObj === "object") {
+    const nested =
+      (videoObj as Record<string, unknown>).videoId ??
+      (videoObj as Record<string, unknown>).guid;
+    if (typeof nested === "string" && nested.trim()) {
+      return nested.trim();
+    }
+  }
+
+  return null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -44,18 +81,23 @@ Deno.serve(async (req) => {
     const cdnHost = Deno.env.get("BUNNY_STREAM_CDN_HOST") ?? undefined;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { data: pendingVideos, error: pendingError } = await supabase
+    const webhookVideoId = await extractWebhookVideoId(req);
+    const pendingQuery = supabase
       .from("videos")
       .select("id, bunny_video_id")
       .eq("status", "processing")
       .limit(50);
+
+    const { data: pendingVideos, error: pendingError } = webhookVideoId
+      ? await pendingQuery.eq("bunny_video_id", webhookVideoId)
+      : await pendingQuery;
 
     if (pendingError) {
       return json(500, { error: "Failed to load processing videos", details: pendingError.message });
     }
 
     if (!pendingVideos || pendingVideos.length === 0) {
-      return json(200, { checked: 0, updated: 0 });
+      return json(200, { checked: 0, updated: 0, webhookVideoId });
     }
 
     let updated = 0;
@@ -92,7 +134,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json(200, { checked: pendingVideos.length, updated });
+    return json(200, { checked: pendingVideos.length, updated, webhookVideoId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return json(500, { error: message });
