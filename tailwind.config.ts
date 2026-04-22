@@ -63,6 +63,18 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ["'Roboto Condensed'", "system-ui", "sans-serif"],
+        display: ["'Roboto Condensed'", "system-ui", "sans-serif"],
+      },
+      backgroundImage: {
+        "gradient-purple": "linear-gradient(135deg, hsl(280 76% 63%), hsl(280 73% 35%))",
+        "gradient-header": "linear-gradient(180deg, hsl(280 60% 18%) 0%, hsl(270 40% 8%) 100%)",
+      },
+      boxShadow: {
+        glow: "0 0 20px hsl(280 76% 63% / 0.6)",
+        "glow-soft": "0 0 30px hsl(280 76% 63% / 0.35)",
+      },
       keyframes: {
         "accordion-down": {
           from: {
