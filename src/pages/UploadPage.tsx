@@ -97,7 +97,7 @@ const UploadPage = () => {
               <a href="#" className="text-primary hover:underline">
                 Click here
               </a>{" "}
-              for more detgailed content guidelines
+              for more detailed content guidelines
             </p>
           </section>
 
