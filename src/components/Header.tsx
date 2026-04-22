@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Menu, X, User } from "lucide-react";
+import { Search, Menu, X, User, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
 
@@ -74,6 +74,16 @@ const Header = () => {
                 </a>
               </li>
             ))}
+            <li>
+              <Link
+                to="/upload"
+                onClick={() => setOpen(false)}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-purple px-8 py-3 uppercase tracking-widest text-white btn-glow hover:opacity-95 transition-opacity"
+              >
+                Upload
+                <Upload className="h-4 w-4" />
+              </Link>
+            </li>
           </ul>
         </nav>
       )}
