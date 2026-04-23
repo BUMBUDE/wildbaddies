@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Volume2, VolumeX, Settings, Maximize } from "lucide-react";
+import Hls from "hls.js";
 import { Slider } from "@/components/ui/slider";
 import poster from "@/assets/video-placeholder.jpg";
 
@@ -18,6 +19,7 @@ interface VideoPlayerProps {
 const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   const ref = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -25,15 +27,62 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
 
-  // Reload video when URL changes
+  // Reload video when URL changes (HLS-aware)
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    v.load();
+
     setPlaying(false);
     setStarted(false);
     setCurrent(0);
     setDuration(0);
+
+    // Cleanup any prior hls instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (!videoUrl) {
+      v.removeAttribute("src");
+      v.load();
+      return;
+    }
+
+    const isHls = /\.m3u8(\?|$)/i.test(videoUrl);
+
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true });
+      hlsRef.current = hls;
+      hls.loadSource(videoUrl);
+      hls.attachMedia(v);
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (!data.fatal) return;
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            hls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hls.recoverMediaError();
+            break;
+          default:
+            hls.destroy();
+            hlsRef.current = null;
+        }
+      });
+    } else if (isHls && v.canPlayType("application/vnd.apple.mpeg-url")) {
+      v.src = videoUrl;
+    } else {
+      // Legacy mp4 / other: rely on <source> child
+      v.load();
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
   }, [videoUrl]);
 
   useEffect(() => {
@@ -107,7 +156,9 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
         controls={false}
         preload="metadata"
       >
-        {videoUrl ? <source src={videoUrl} type="video/mp4" /> : null}
+        {videoUrl && !/\.m3u8(\?|$)/i.test(videoUrl) ? (
+          <source src={videoUrl} type="video/mp4" />
+        ) : null}
       </video>
 
       {!playing && (
