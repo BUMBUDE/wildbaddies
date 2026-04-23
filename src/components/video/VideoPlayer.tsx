@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Volume2, VolumeX, Settings, Maximize } from "lucide-react";
 import Hls from "hls.js";
 import { Slider } from "@/components/ui/slider";
-import poster from "@/assets/video-placeholder.jpg";
 
 const formatTime = (s: number) => {
   if (!isFinite(s)) return "0:00";
@@ -143,13 +142,12 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   };
 
   const progress = duration > 0 ? (current / duration) * 100 : 0;
-  const activePoster = posterUrl ?? poster;
 
   return (
     <div ref={containerRef} className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group btn-glow-soft">
       <video
         ref={ref}
-        poster={started ? "" : activePoster}
+        poster={started ? "" : (posterUrl ?? undefined)}
         className="w-full h-full object-contain bg-black"
         onClick={toggle}
         playsInline
@@ -167,15 +165,15 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
           aria-label="Play"
           className="absolute inset-0 grid place-items-center"
         >
-          {!started && (
+          {!started && posterUrl && (
             <img
-              src={activePoster}
+              src={posterUrl}
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
             />
           )}
-          <span className="relative z-10 h-20 w-20 rounded-full bg-gradient-purple grid place-items-center btn-glow">
-            <Play className="h-9 w-9 text-white fill-white ml-1" />
+          <span className="relative z-10 h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 rounded-full bg-gradient-purple grid place-items-center btn-glow">
+            <Play className="h-5 w-5 sm:h-7 sm:w-7 md:h-9 md:w-9 text-white fill-white ml-1" />
           </span>
         </button>
       )}
