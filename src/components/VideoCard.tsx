@@ -42,7 +42,7 @@ const VideoCard = ({ slug, title, duration, durationSeconds, views, rating, thum
         <div className="absolute top-2 right-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
           {formatDuration(durationSeconds, duration)}
         </div>
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-primary/30 to-transparent" />
+        {/* <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-primary/30 to-transparent" /> */}
       </div>
       <div className="text-center">
         <h3 className="text-base font-bold text-white truncate">{title}</h3>
