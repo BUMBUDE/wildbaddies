@@ -19,23 +19,41 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   const ref = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
-  const [duration, setDuration] = useState(109);
+  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+
+  // Reload video when URL changes
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.load();
+    setPlaying(false);
+    setStarted(false);
+    setCurrent(0);
+    setDuration(0);
+  }, [videoUrl]);
 
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     const onTime = () => setCurrent(v.currentTime);
-    const onMeta = () => setDuration(v.duration || 109);
-    const onEnd = () => setPlaying(false);
+    const onMeta = () => setDuration(v.duration || 0);
+    const onPlay = () => { setPlaying(true); setStarted(true); };
+    const onPause = () => setPlaying(false);
+    const onEnd = () => { setPlaying(false); setStarted(false); };
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
     v.addEventListener("ended", onEnd);
     return () => {
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
       v.removeEventListener("ended", onEnd);
     };
   }, []);
@@ -43,18 +61,13 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   const toggle = () => {
     const v = ref.current;
     if (!v) return;
-    if (v.paused) {
-      v.play();
-      setPlaying(true);
-    } else {
-      v.pause();
-      setPlaying(false);
-    }
+    if (v.paused) v.play();
+    else v.pause();
   };
 
   const seek = (val: number[]) => {
     const v = ref.current;
-    if (!v) return;
+    if (!v || !duration) return;
     v.currentTime = (val[0] / 100) * duration;
   };
 
@@ -63,10 +76,7 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
     const nv = val[0] / 100;
     setVolume(nv);
     setMuted(nv === 0);
-    if (v) {
-      v.volume = nv;
-      v.muted = nv === 0;
-    }
+    if (v) { v.volume = nv; v.muted = nv === 0; }
   };
 
   const toggleMute = () => {
@@ -84,18 +94,20 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
   };
 
   const progress = duration > 0 ? (current / duration) * 100 : 0;
+  const activePoster = posterUrl ?? poster;
 
   return (
     <div ref={containerRef} className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group btn-glow-soft">
       <video
         ref={ref}
-        poster={posterUrl ?? poster}
+        poster={started ? "" : activePoster}
         className="w-full h-full object-contain bg-black"
         onClick={toggle}
         playsInline
         controls={false}
+        preload="metadata"
       >
-        <source src={videoUrl ?? "https://www.w3schools.com/html/mov_bbb.mp4"} type="video/mp4" />
+        {videoUrl ? <source src={videoUrl} type="video/mp4" /> : null}
       </video>
 
       {!playing && (
@@ -104,7 +116,14 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
           aria-label="Play"
           className="absolute inset-0 grid place-items-center"
         >
-          <span className="h-20 w-20 rounded-full bg-gradient-purple grid place-items-center btn-glow">
+          {!started && (
+            <img
+              src={activePoster}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+          <span className="relative z-10 h-20 w-20 rounded-full bg-gradient-purple grid place-items-center btn-glow">
             <Play className="h-9 w-9 text-white fill-white ml-1" />
           </span>
         </button>
