@@ -1,6 +1,4 @@
 import { Eye, Star } from "lucide-react";
-import { Link } from "react-router-dom";
-import poster from "@/assets/video-placeholder.jpg";
 
 interface VideoCardProps {
   slug?: string;
@@ -30,14 +28,18 @@ const VideoCard = ({ slug, title, duration, durationSeconds, views, rating, thum
   const fallbackSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "video";
   const videoSlug = slug ?? fallbackSlug;
   return (
-    <Link to={`/video/${videoSlug}`} className="group flex flex-col gap-3">
+    <a href={`/video/${videoSlug}`} className="group flex flex-col gap-3">
       <div className="relative overflow-hidden rounded-lg bg-secondary aspect-video">
-        <img
-          src={thumbnailUrl ?? poster}
-          alt={`${title} thumbnail`}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={`${title} thumbnail`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="h-full w-full bg-black" />
+        )}
         <div className="absolute inset-0 ring-1 ring-inset ring-white/5 rounded-lg pointer-events-none" />
         <div className="absolute top-2 right-2 rounded bg-black/75 px-2 py-0.5 text-xs font-bold text-white">
           {formatDuration(durationSeconds, duration)}
@@ -55,7 +57,7 @@ const VideoCard = ({ slug, title, duration, durationSeconds, views, rating, thum
           </span>
         </div>
       </div>
-    </Link>
+    </a>
   );
 };
 
