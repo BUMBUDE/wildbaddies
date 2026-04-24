@@ -13,12 +13,14 @@ const formatTime = (s: number) => {
 interface VideoPlayerProps {
   videoUrl?: string | null;
   posterUrl?: string | null;
+  onFirstPlay?: () => void;
 }
 
-const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
+const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => {
   const ref = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const firstPlayFiredRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -35,6 +37,7 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
     setStarted(false);
     setCurrent(0);
     setDuration(0);
+    firstPlayFiredRef.current = false;
 
     // Cleanup any prior hls instance
     if (hlsRef.current) {
@@ -89,7 +92,14 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
     if (!v) return;
     const onTime = () => setCurrent(v.currentTime);
     const onMeta = () => setDuration(v.duration || 0);
-    const onPlay = () => { setPlaying(true); setStarted(true); };
+    const onPlay = () => {
+      setPlaying(true);
+      setStarted(true);
+      if (!firstPlayFiredRef.current) {
+        firstPlayFiredRef.current = true;
+        onFirstPlay?.();
+      }
+    };
     const onPause = () => setPlaying(false);
     const onEnd = () => { setPlaying(false); setStarted(false); };
     v.addEventListener("timeupdate", onTime);
@@ -104,7 +114,7 @@ const VideoPlayer = ({ videoUrl, posterUrl }: VideoPlayerProps) => {
       v.removeEventListener("pause", onPause);
       v.removeEventListener("ended", onEnd);
     };
-  }, []);
+  }, [onFirstPlay]);
 
   const toggle = () => {
     const v = ref.current;

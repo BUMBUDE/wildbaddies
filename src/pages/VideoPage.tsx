@@ -9,7 +9,7 @@ import VideoActions from "@/components/video/VideoActions";
 import VideoMeta from "@/components/video/VideoMeta";
 import VideoComments from "@/components/video/VideoComments";
 import SimilarVideos from "@/components/video/SimilarVideos";
-import { getVideoBySlug, listVideos } from "@/lib/videos";
+import { getVideoBySlug, listVideos, incrementVideoView } from "@/lib/videos";
 
 const VideoPage = () => {
   const { slug } = useParams();
@@ -52,7 +52,11 @@ const VideoPage = () => {
           {!isLoading && !isError && !video && (
             <p className="text-muted-foreground">Video not found or still processing.</p>
           )}
-          <VideoPlayer videoUrl={video?.playback_url} posterUrl={video?.thumbnail_url} />
+          <VideoPlayer
+            videoUrl={video?.playback_url}
+            posterUrl={video?.thumbnail_url}
+            onFirstPlay={video?.id ? () => incrementVideoView(video.id) : undefined}
+          />
           <VideoActions />
           <VideoMeta />
           <VideoComments />

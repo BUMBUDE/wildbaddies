@@ -1,16 +1,34 @@
 import { FormEvent, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Upload as UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { uploadVideo } from "@/lib/videos";
+import { listCategories } from "@/lib/categories";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const UploadPage = () => {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastVideoId, setLastVideoId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } = useQuery({
+    queryKey: ["categories"],
+    queryFn: listCategories,
+  });
+
+  const toggleCategory = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -21,12 +39,13 @@ const UploadPage = () => {
         throw new Error("Video file is required.");
       }
 
-      return uploadVideo(title.trim(), file);
+      return uploadVideo(title.trim(), file, Array.from(selectedIds));
     },
     onSuccess: (result) => {
       setLastVideoId(result.videoId);
       setTitle("");
       setFile(null);
+      setSelectedIds(new Set());
       toast.success("Video uploaded to Bunny and queued for processing.");
       queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
@@ -69,6 +88,63 @@ const UploadPage = () => {
                   required
                 />
               </label>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <span className="block font-bold tracking-wider uppercase">
+                    Categories
+                  </span>
+                  <span className="block text-sm text-muted-foreground">
+                    Select all that apply
+                  </span>
+                </div>
+
+                {categoriesLoading && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full rounded-md" />
+                    ))}
+                  </div>
+                )}
+
+                {categoriesError && (
+                  <p className="text-sm text-destructive">Failed to load categories.</p>
+                )}
+
+                {!categoriesLoading && !categoriesError && categories.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No categories available.</p>
+                )}
+
+                {!categoriesLoading && categories.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {categories.map((cat) => {
+                        const checked = selectedIds.has(cat.id);
+                        return (
+                          <label
+                            key={cat.id}
+                            data-state={checked ? "checked" : "unchecked"}
+                            className="flex items-center gap-2 rounded-md border border-primary/40 bg-secondary/30 px-3 py-2.5 cursor-pointer transition-colors hover:border-primary hover:bg-primary/10 data-[state=checked]:border-primary data-[state=checked]:bg-primary/15"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => toggleCategory(cat.id)}
+                            />
+                            <span className="text-sm text-foreground truncate">
+                              {cat.name}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {selectedIds.size > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedIds.size} selected
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
 
               <div className="space-y-2">
                 <span className="font-bold tracking-wider uppercase">
