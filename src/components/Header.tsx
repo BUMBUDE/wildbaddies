@@ -3,7 +3,12 @@ import { Search, Menu, X, User, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
 
-const navItems = ["Videos", "Categories", "Tags", "Porn Directory"];
+const navItems: { label: string; href: string }[] = [
+  { label: "Videos", href: "/" },
+  { label: "Categories", href: "/categories" },
+  { label: "Tags", href: "#" },
+  { label: "Porn Directory", href: "#" },
+];
 
 const Header = () => {
   const [open, setOpen] = useState(false);
@@ -68,10 +73,14 @@ const Header = () => {
         <nav className="border-t border-primary/20 bg-gradient-header animate-in fade-in slide-in-from-top-2 duration-200">
           <ul className="container py-6 flex flex-col items-center gap-5 text-white font-bold tracking-wider">
             {navItems.map((item) => (
-              <li key={item}>
-                <a href="#" className="hover:text-primary transition-colors">
-                  {item.toUpperCase()}
-                </a>
+              <li key={item.label}>
+                <Link
+                  to={item.href}
+                  onClick={() => setOpen(false)}
+                  className="hover:text-primary transition-colors"
+                >
+                  {item.label.toUpperCase()}
+                </Link>
               </li>
             ))}
             <li>

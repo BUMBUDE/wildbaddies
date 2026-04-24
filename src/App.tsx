@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import VideoPage from "./pages/VideoPage.tsx";
 import UploadPage from "./pages/UploadPage.tsx";
+import CategoriesPage from "./pages/CategoriesPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/video/:slug" element={<VideoPage />} />
           <Route path="/upload" element={<UploadPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
