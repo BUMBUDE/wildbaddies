@@ -54,11 +54,14 @@ export const getVideoBySlug = async (slug: string): Promise<VideoRecord | null> 
   return data as VideoRecord | null;
 };
 
-export const uploadVideo = async (title: string, file: File) => {
+export const uploadVideo = async (title: string, file: File, categoryIds: string[] = []) => {
   const client = ensureSupabase();
   const formData = new FormData();
   formData.set("title", title);
   formData.set("file", file);
+  if (categoryIds.length > 0) {
+    formData.set("category_ids", JSON.stringify(categoryIds));
+  }
 
   const { data, error } = await client.functions.invoke("create-video", {
     body: formData,
@@ -69,4 +72,13 @@ export const uploadVideo = async (title: string, file: File) => {
   }
 
   return data as { videoId: string; dbId: string; slug: string; status: VideoStatus; message: string };
+};
+
+export const incrementVideoView = async (videoId: string): Promise<void> => {
+  const client = ensureSupabase();
+  try {
+    await client.functions.invoke("increment-view", { body: { videoId } });
+  } catch {
+    // Best-effort; never break playback.
+  }
 };
