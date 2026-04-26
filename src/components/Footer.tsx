@@ -14,7 +14,7 @@ const Footer = () => {
       </div>
 
       <div className="container py-10 flex flex-col items-center gap-6 border-t border-primary/15">
-        <a href="/" className="flex items-center gap-2">
+        {/*<a href="/" className="flex items-center gap-2">
           <img
             src={mascot}
             alt="Baddies mascot"
@@ -22,9 +22,9 @@ const Footer = () => {
             height={64}
             loading="lazy"
             className="h-14 w-14 drop-shadow-[0_0_18px_hsl(var(--primary)/0.55)]"
-          />
-          <span className="text-3xl font-bold text-white text-glow">BADDIES</span>
-        </a>
+          />*/}
+          <span className="text-3xl font-bold text-white text-glow"> WILD BADDIES</span>
+        {/*</a>*/}
 
         <nav className="flex flex-wrap justify-center gap-6 text-white font-bold tracking-wider">
           {primaryLinks.map((l) => (
@@ -45,7 +45,7 @@ const Footer = () => {
         <p className="text-muted-foreground text-sm">Adult Sites</p>
 
         <p className="text-muted-foreground text-xs">
-          © {new Date().getFullYear()} Baddies. All rights reserved.
+          © {new Date().getFullYear()} Wild Baddies. All rights reserved.
         </p>
       </div>
     </footer>
