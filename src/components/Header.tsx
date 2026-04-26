@@ -17,14 +17,14 @@ const Header = () => {
     <header className="relative z-30 bg-gradient-header border-b border-primary/20">
       <div className="container flex items-center justify-between gap-4 py-4">
         {/* Logo */}
-        {/* <Link to="/" className="flex items-center gap-2 shrink-0">
+         <Link to="/" className="flex items-center gap-2 shrink-0">
           <img
             src={mascot}
             alt="Baddies mascot logo"
             width={56}
             height={56}
             className="h-12 w-12 sm:h-14 sm:w-14 drop-shadow-[0_0_15px_hsl(var(--primary)/0.6)]"
-          /> */}
+          />
           <span className="text-2xl sm:text-3xl font-bold tracking-wide text-white text-glow">
             BADDIES
           </span>
