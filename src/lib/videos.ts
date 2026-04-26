@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import * as tus from "tus-js-client";
 
 export type VideoStatus = "processing" | "ready" | "failed";
 
@@ -20,7 +21,6 @@ const ensureSupabase = () => {
   if (!supabase) {
     throw new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
-
   return supabase;
 };
 
@@ -32,10 +32,7 @@ export const listVideos = async (status: VideoStatus = "ready"): Promise<VideoRe
     .eq("status", status)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  if (error) throw new Error(error.message);
   return (data ?? []) as VideoRecord[];
 };
 
@@ -47,31 +44,90 @@ export const getVideoBySlug = async (slug: string): Promise<VideoRecord | null> 
     .eq("slug", slug)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  if (error) throw new Error(error.message);
   return data as VideoRecord | null;
 };
 
-export const uploadVideo = async (title: string, file: File, categoryIds: string[] = []) => {
-  const client = ensureSupabase();
-  const formData = new FormData();
-  formData.set("title", title);
-  formData.set("file", file);
-  if (categoryIds.length > 0) {
-    formData.set("category_ids", JSON.stringify(categoryIds));
-  }
+export interface UploadVideoOptions {
+  title: string;
+  file: File;
+  categoryIds?: string[];
+  onProgress?: (percentage: number) => void;
+}
 
-  const { data, error } = await client.functions.invoke("create-video", {
-    body: formData,
+export interface UploadVideoResult {
+  videoId: string;
+  dbId: string;
+  slug: string;
+  status: VideoStatus;
+  categoriesInserted: number;
+}
+
+/**
+ * Direct-to-Bunny TUS upload flow:
+ * 1. Call `get-upload-url` edge function — creates Bunny video + DB row, returns TUS credentials
+ * 2. Upload file directly from client → Bunny TUS endpoint (never passes through Supabase)
+ * 3. Bunny encodes; sync-video-status / webhook flips status to ready
+ */
+export const uploadVideo = async ({
+  title,
+  file,
+  categoryIds = [],
+  onProgress,
+}: UploadVideoOptions): Promise<UploadVideoResult> => {
+  const client = ensureSupabase();
+
+  // Step 1: Get TUS credentials from edge function
+  const { data, error } = await client.functions.invoke("get-upload-url", {
+    body: { title, categoryIds },
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
-  return data as { videoId: string; dbId: string; slug: string; status: VideoStatus; message: string };
+  const {
+    videoId,
+    dbId,
+    slug,
+    status,
+    categoriesInserted,
+    tusEndpoint,
+    tusHeaders,
+  } = data as {
+    videoId: string;
+    dbId: string;
+    slug: string;
+    status: VideoStatus;
+    categoriesInserted: number;
+    tusEndpoint: string;
+    tusHeaders: Record<string, string>;
+  };
+
+  // Step 2: Upload directly to Bunny via TUS (no Supabase memory involved)
+  await new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint: tusEndpoint,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: tusHeaders,
+      metadata: {
+        filename: file.name,
+        filetype: file.type,
+      },
+      onProgress(bytesUploaded, bytesTotal) {
+        const pct = Math.round((bytesUploaded / bytesTotal) * 100);
+        onProgress?.(pct);
+      },
+      onSuccess() {
+        resolve();
+      },
+      onError(err) {
+        reject(new Error(`TUS upload failed: ${err.message}`));
+      },
+    });
+
+    upload.start();
+  });
+
+  return { videoId, dbId, slug, status, categoriesInserted };
 };
 
 export const incrementVideoView = async (videoId: string): Promise<void> => {

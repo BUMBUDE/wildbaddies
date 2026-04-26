@@ -1,88 +1,61 @@
-##  Task 1 — Increment view count only when user actually presses Play
+## Direct-to-Bunny TUS upload migration
 
-### DB
+Switch the upload flow from "browser → Supabase edge function → Bunny" to "browser → Bunny (direct, via TUS)". The edge function only mints credentials and creates the DB row — it never touches the file bytes.
 
-- Add migration creating SQL function `public.increment_video_view(video_id uuid)` that does `UPDATE public.videos SET views = views + 1 WHERE id = video_id`. Marked `SECURITY DEFINER`, `SET search_path = public`, granted EXECUTE to `anon` + `authenticated` so the public site can call it without auth.
+### 1. Install dependency
 
-### Edge Function
+- `bun add tus-js-client` (adds runtime dep + types — `tus-js-client` ships its own `.d.ts`).
 
-- Create `supabase/functions/increment-view/index.ts`:
-  - CORS (OPTIONS handler + headers on every response).
-  - POST only. Validate body `{ videoId: uuid }` with Zod-like check (regex for uuid).
-  - Use service-role client, call `supabase.rpc("increment_video_view", { video_id: videoId })`.
-  - Return `{ ok: true }`.
-- `verify_jwt = false` endpoint is public-callable.
+### Dont do this,, i have done it-2. New edge function: `supabase/functions/get-upload-url/index.ts`
 
-### Frontend
+Replaces `create-video` for the upload step. Responsibilities:
 
-- `src/lib/videos.ts`: add `incrementVideoView(videoId)` that calls `supabase.functions.invoke("increment-view", { body: { videoId } })`. Errors are swallowed (view count is best-effort, must not break playback).
-- `src/components/video/VideoPlayer.tsx`:
-  - Add optional prop `videoId?: string` and `onFirstPlay?: () => void`.
-  - In existing `onPlay` handler, the FIRST time `play` fires for a given `videoUrl`, call `onFirstPlay?.()`. Reset that "fired" guard whenever `videoUrl` changes (alongside the existing reset effect). This guarantees the call fires only on a real `play` event (not on autoplay-blocked, not on metadata load, not on hover).
-- `src/pages/VideoPage.tsx`:
-  - Pass `videoId={video?.id}` and `onFirstPlay={() => incrementVideoView(video.id)}` to `<VideoPlayer />`.
+- POST JSON body: `{ title: string, categoryIds?: string[] }`.
+- Validate `title`.
+- Call Bunny `POST /library/{libraryId}/videos` with `{ title }` → get `videoId` (guid).
+- Insert into `videos` (status `processing`, slug `<slugified-title>-<videoId[0..8]>`, `playback_url` from `buildPlaybackUrl`) using service-role client → get `dbId`.
+- If `categoryIds` provided, bulk-insert into `video_categories` (`video_id = dbId`, `category_id = each`); count successful rows for `categoriesInserted`.
+- Build TUS credentials per Bunny spec:
+  - `tusEndpoint`: `https://video.bunnycdn.com/tusupload`
+  - Expiration: `Math.floor(Date.now() / 1000) + 3600` (1 hour)
+  - `AuthorizationSignature` = SHA-256 hex of `libraryId + accessKey + expiration + videoId` (using Web Crypto `crypto.subtle.digest`)
+  - `tusHeaders`:
+    - `AuthorizationSignature`: &nbsp;
+    - `AuthorizationExpire`: &nbsp;
+    - `VideoId`: &nbsp;
+    - `LibraryId`: &nbsp;
+- Respond JSON: `{ videoId, dbId, slug, status, categoriesInserted, tusEndpoint, tusHeaders }`.
+- Standard CORS + OPTIONS handling (mirroring existing functions).
+- Reuse `slugify` and `buildPlaybackUrl` from `_shared/video-utils.ts`.
 
-### Why this is safe
+The existing `create-video` function stays in the repo for now (no deletion) but will become unused; the frontend stops invoking it.
 
-- View only increments on the actual `play` media event → satisfies "only after user actually watches / pressed play".
-- One increment per page load (guard by `videoUrl`) → repeated pause/play doesn't inflate.
-- RPC is atomic increment; no race conditions.
+### 3. Frontend `src/lib/videos.ts`
 
----
+Replace contents with the user-provided `videos_1.ts`:
 
-## Task 2 — Categories multi-select on Upload page
+- New `uploadVideo({ title, file, categoryIds, onProgress })` signature returning `{ videoId, dbId, slug, status, categoriesInserted }`.
+- Two-step flow: invoke `get-upload-url` → run `tus.Upload` straight to Bunny with progress callback.
+- Keep existing `listVideos`, `getVideoBySlug`, `incrementVideoView`, `listVideoCategories`, types.
 
-### I have done this in supabase dont do it again- DB (new migration)
+### 4. Frontend `src/pages/UploadPage.tsx`
 
-- Create `public.video_categories` join table:
-  - `video_id uuid references public.videos(id) on delete cascade`
-  - `category_id uuid references public.categories(id) on delete cascade`
-  - `primary key (video_id, category_id)`
-- Index on `category_id` for filter queries.
-- Enable RLS; policies:
-  - `select` to `anon, authenticated` (public catalog).
-  - `insert/delete` only to service role (used by edge function).
+Replace with the user-provided version:
 
-### I have done this in supabase dont do it again-Edge function (`create-video`)
-
-- Accept additional form field `category_ids` as a JSON-encoded array of UUIDs (multipart can't send arrays cleanly; JSON string is simplest).
-- Validate each entry is a UUID.
-- After inserting the video row, if any categories were provided, bulk-insert into `video_categories` with `{ video_id: inserted.id, category_id }`. Errors there don't roll back the video, but are returned in the response payload as `categoriesError` so we can surface a toast.
-
-### Frontend data
-
-- `src/lib/videos.ts` `uploadVideo(title, file, categoryIds)`:
-  - Append `category_ids` (JSON string) to the FormData before invoking the function.
-
-### UI — `src/pages/UploadPage.tsx`
-
-Match the screenshot layout (left = form fields stacked, right = upload rules). Add a Categories block between the Title field and the file picker:
-
-- Heading: "CATEGORIES" (uppercase, `font-bold tracking-wider`, brand purple bullet/dot consistent with rest of page).
-- Helper line: "Select all that apply" (`text-muted-foreground text-sm`).
-- Multi-select using `@/components/ui/checkbox` (already in the project) inside a responsive grid:
-  - Mobile: `grid-cols-2`
-  - sm: `grid-cols-3`
-  - lg: `grid-cols-4`
-  - Each cell: rounded `border border-primary/40 bg-secondary/30 p-3` flex row with checkbox + label, hover + checked states use brand purple (`data-[state=checked]:bg-primary` already in checkbox.tsx; the wrapping label gets `has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10`).
-  - Label is the category name in normal case (not uppercased — matches screenshot).
-- Selected count chip under the grid: "X selected" in muted text, only shown when > 0.
-- Loading: shadcn `Skeleton` blocks while categories fetch.
-- Empty/error state: small muted message.
-
-State + behavior:
-
-- `useQuery({ queryKey: ["categories"], queryFn: listCategories })` (already exists in `src/lib/categories.ts`).
-- `selectedIds: Set<string>` in `useState`. Toggle on checkbox change.
-- On submit, pass `Array.from(selectedIds)` to `uploadVideo`.
-- Reset selection on success alongside title/file reset.
-- Categories are optional (no validation gate) — keeps the existing required fields (title + file) unchanged.
+- New `progress` state + real-time progress bar (gradient-purple, brand styled).
+- All inputs (`title`, category checkboxes, file picker) get `disabled={isPending}`.
+- Pass `onProgress: setProgress` into `uploadVideo`.
+- Reset progress on success/error.
 
 ### Files touched
 
-- add migration `supabase/migrations/<ts>_increment_view_and_video_categories.sql` (function + join table + RLS)
-- add `supabase/functions/increment-view/index.ts`
-- edit `src/lib/videos.ts` (add `incrementVideoView`, extend `uploadVideo` signature)
-- edit `src/components/video/VideoPlayer.tsx` (first-play callback)
-- edit `src/pages/VideoPage.tsx` (wire callback)
-- edit `src/pages/UploadPage.tsx` (categories multi-select UI + wire submit)
+- edit `package.json` / `bun.lock` (add `tus-js-client`)
+- replace `src/lib/videos.ts`
+- replace `src/pages/UploadPage.tsx`
+
+### Notes / risks
+
+- Bunny TUS auth uses SHA-256 of `libraryId + accessKey + expiration + videoId` — implemented via Web Crypto in Deno (no extra deps).
+- `BUNNY_STREAM_LIBRARY_ID` and `BUNNY_STREAM_API_KEY` env vars (already present for `create-video`) are reused.
+- Bunny CORS: their TUS endpoint allows browser uploads with the signature headers above; no proxy needed.
+- File never passes through Supabase, so the 6 MB edge function body limit no longer applies — large uploads (multi-GB) become possible.

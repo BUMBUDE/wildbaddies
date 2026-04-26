@@ -13,6 +13,7 @@ const UploadPage = () => {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [progress, setProgress] = useState(0);
   const [lastVideoId, setLastVideoId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -32,24 +33,29 @@ const UploadPage = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!title.trim()) {
-        throw new Error("Title is required.");
-      }
-      if (!file) {
-        throw new Error("Video file is required.");
-      }
+      if (!title.trim()) throw new Error("Title is required.");
+      if (!file) throw new Error("Video file is required.");
 
-      return uploadVideo(title.trim(), file, Array.from(selectedIds));
+      setProgress(0);
+
+      return uploadVideo({
+        title: title.trim(),
+        file,
+        categoryIds: Array.from(selectedIds),
+        onProgress: setProgress,
+      });
     },
     onSuccess: (result) => {
       setLastVideoId(result.videoId);
       setTitle("");
       setFile(null);
       setSelectedIds(new Set());
+      setProgress(0);
       toast.success("Video uploaded to Bunny and queued for processing.");
       queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
     onError: (error) => {
+      setProgress(0);
       const message = error instanceof Error ? error.message : "Upload failed.";
       toast.error(message);
     },
@@ -59,6 +65,8 @@ const UploadPage = () => {
     event.preventDefault();
     uploadMutation.mutate();
   };
+
+  const isPending = uploadMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -77,26 +85,21 @@ const UploadPage = () => {
           <section className="lg:col-span-2 space-y-8">
             <form onSubmit={onSubmit} className="space-y-5 rounded-md border border-primary/40 bg-secondary/20 p-5">
               <label className="block space-y-2">
-                <span className="font-bold tracking-wider uppercase">
-                  Video title
-                </span>
+                <span className="font-bold tracking-wider uppercase">Video title</span>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Type your title"
-                  className="w-full rounded-md border border-primary/40 bg-secondary/30 px-4 py-3 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
+                  disabled={isPending}
+                  className="w-full rounded-md border border-primary/40 bg-secondary/30 px-4 py-3 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
                   required
                 />
               </label>
 
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <span className="block font-bold tracking-wider uppercase">
-                    Categories
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    Select all that apply
-                  </span>
+                  <span className="block font-bold tracking-wider uppercase">Categories</span>
+                  <span className="block text-sm text-muted-foreground">Select all that apply</span>
                 </div>
 
                 {categoriesLoading && (
@@ -129,27 +132,22 @@ const UploadPage = () => {
                             <Checkbox
                               checked={checked}
                               onCheckedChange={() => toggleCategory(cat.id)}
+                              disabled={isPending}
                             />
-                            <span className="text-sm text-foreground truncate">
-                              {cat.name}
-                            </span>
+                            <span className="text-sm text-foreground truncate">{cat.name}</span>
                           </label>
                         );
                       })}
                     </div>
                     {selectedIds.size > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedIds.size} selected
-                      </p>
+                      <p className="text-xs text-muted-foreground">{selectedIds.size} selected</p>
                     )}
                   </>
                 )}
               </div>
 
               <div className="space-y-2">
-                <span className="font-bold tracking-wider uppercase">
-                  Video file
-                </span>
+                <span className="font-bold tracking-wider uppercase">Video file</span>
                 <div className="flex items-center gap-3 rounded-md border border-primary/40 bg-secondary/30 p-2">
                   <label className="cursor-pointer rounded-full bg-gradient-purple px-5 py-2 text-sm font-bold uppercase tracking-wider text-white btn-glow-soft hover:btn-glow transition-shadow">
                     Choose file
@@ -157,6 +155,7 @@ const UploadPage = () => {
                       type="file"
                       accept="video/*"
                       className="hidden"
+                      disabled={isPending}
                       onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                       required
                     />
@@ -167,12 +166,28 @@ const UploadPage = () => {
                 </div>
               </div>
 
+              {/* Progress bar — shown during upload */}
+              {isPending && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{progress < 100 ? "Uploading to Bunny…" : "Processing…"}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-purple transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={uploadMutation.isPending}
+                disabled={isPending}
                 className="w-full sm:w-80 rounded-full bg-gradient-purple py-3.5 font-bold uppercase tracking-widest text-white btn-glow hover:opacity-95 transition-opacity disabled:opacity-60"
               >
-                {uploadMutation.isPending ? "Uploading..." : "Upload video"}
+                {isPending ? "Uploading…" : "Upload video"}
               </button>
             </form>
 
@@ -180,19 +195,16 @@ const UploadPage = () => {
               <div className="rounded-md border border-primary/40 bg-secondary/20 px-4 py-3 text-sm">
                 <p className="font-bold text-white">Upload submitted</p>
                 <p className="text-muted-foreground">Bunny videoId: {lastVideoId}</p>
-                <p className="text-muted-foreground">Status: processing</p>
+                <p className="text-muted-foreground">Status: processing — will appear once Bunny finishes encoding.</p>
               </div>
             )}
           </section>
 
           {/* Rules */}
           <aside className="space-y-4">
-            <h2 className="text-xl font-bold tracking-wider uppercase">
-              Upload Rules
-            </h2>
+            <h2 className="text-xl font-bold tracking-wider uppercase">Upload Rules</h2>
             <p className="text-foreground/90">
-              Before uploading, please make sure that your content meets the
-              following conditions:
+              Before uploading, please make sure that your content meets the following conditions:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-foreground/90">
               <li>Contains sex, masturbation, or nudity</li>
