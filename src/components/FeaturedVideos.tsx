@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import VideoCard from "./VideoCard";
+import VideoCardSkeleton from "./VideoCardSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
+import { listCategories, type CategoryRecord } from "@/lib/categories";
+import { getVideosByCategory } from "@/lib/videos";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Video {
@@ -60,12 +64,13 @@ const SORT_OPTIONS = [
   { value: "rating", label: "Top Rated" },
 ];
 
-const CATEGORY_CHIPS = [
-  "All", "Amateur Baddies", "Black Baddies", "Sextapes", "Teen Baddies",
-  "Big Tits", "Latina vs BBC", "Black on Black", "Blowjob", "Big Ass",
-  "Latina Baddies", "BBW Baddies", "Strippers", "Interracial",
-  "White on White", "White on Black", "Threesome", "Boy-Boy-Girl", "Boy-Girl-Girl",
-];
+const COLLAPSED_CHIPS_COUNT = 8;
+
+const sortToCategorySort = (s: string): "recent" | "viewed" | "rated" => {
+  if (s === "views") return "viewed";
+  if (s === "rating") return "rated";
+  return "recent";
+};
 
 // ─── Pagination UI ────────────────────────────────────────────────────────────
 function getPageWindow(current: number, total: number): (number | "…")[] {
@@ -90,11 +95,52 @@ const FeaturedVideos = () => {
   const [page,  setPage]  = useState(1);
   const [limit, setLimit] = useState(30);
   const [sort,  setSort]  = useState("newest");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [expanded, setExpanded] = useState(false);
+
+  // ── Categories
+  const { data: categories, isLoading: catsLoading } = useQuery<CategoryRecord[]>({
+    queryKey: ["categories", "list"],
+    queryFn: listCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Videos (All vs by-category)
+  const isAll = selectedCategory === "all";
 
   const { data, isLoading, isError, error, isFetching } = useQuery<ListVideosResponse>({
-    queryKey: ["videos", "list", page, limit, sort],
-    queryFn:  () => fetchVideos(page, limit, sort),
-    placeholderData: (prev) => prev, // keep old data while fetching next page
+    queryKey: ["videos", "list", selectedCategory, page, limit, sort],
+    queryFn: async () => {
+      if (isAll) return fetchVideos(page, limit, sort);
+      const res = await getVideosByCategory(selectedCategory, sortToCategorySort(sort));
+      const all = res.videos.map((v) => ({
+        id: v.id,
+        title: v.title,
+        slug: v.slug,
+        thumbnail_url: v.thumbnail_url,
+        duration_seconds: v.duration_seconds ?? 0,
+        views: v.views,
+        rating: v.rating,
+        status: v.status,
+        created_at: v.created_at,
+      })) as Video[];
+      const totalCount = all.length;
+      const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+      const start = (page - 1) * limit;
+      const slice = all.slice(start, start + limit);
+      return {
+        videos: slice,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+      };
+    },
+    placeholderData: (prev) => prev,
   });
 
   const videos     = data?.videos     ?? [];
@@ -118,6 +164,20 @@ const FeaturedVideos = () => {
     setPage(1);
   };
 
+  const handleCategoryChange = (slug: string) => {
+    setSelectedCategory(slug);
+    setPage(1);
+  };
+
+  // Build chip list: synthetic "All" + DB categories
+  const allChips = useMemo(() => {
+    const dbChips = (categories ?? []).map((c) => ({ slug: c.slug, name: c.name }));
+    return [{ slug: "all", name: "All" }, ...dbChips];
+  }, [categories]);
+
+  const visibleChips = expanded ? allChips : allChips.slice(0, COLLAPSED_CHIPS_COUNT);
+  const canExpand = allChips.length > COLLAPSED_CHIPS_COUNT;
+
   return (
     <section className="container py-10 sm:py-16">
       <h2 className="text-center text-4xl sm:text-6xl font-bold text-white text-glow tracking-tight">
@@ -126,10 +186,36 @@ const FeaturedVideos = () => {
 
       {/* Category chips */}
       <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-5xl mx-auto">
-        {CATEGORY_CHIPS.map((c) => (
-          <span key={c} className="chip">{c}</span>
-        ))}
-        <span className="chip border-primary text-primary">Show All Categories</span>
+        {catsLoading
+          ? Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-24 rounded-full" />
+            ))
+          : visibleChips.map((c) => {
+              const active = selectedCategory === c.slug;
+              return (
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => handleCategoryChange(c.slug)}
+                  className={
+                    active
+                      ? "chip bg-gradient-purple text-white border-transparent btn-glow"
+                      : "chip"
+                  }
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+        {!catsLoading && canExpand && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="chip border-primary text-primary"
+          >
+            {expanded ? "Hide Categories" : "Show All Categories"}
+          </button>
+        )}
       </div>
 
       {/* Controls row */}
@@ -181,7 +267,11 @@ const FeaturedVideos = () => {
         }`}
       >
         {isLoading && (
-          <p className="text-muted-foreground col-span-full">Loading videos…</p>
+          <>
+            {Array.from({ length: Math.min(limit, 12) }).map((_, i) => (
+              <VideoCardSkeleton key={i} />
+            ))}
+          </>
         )}
         {isError && (
           <p className="text-destructive col-span-full">
