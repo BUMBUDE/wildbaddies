@@ -162,3 +162,90 @@ export const listVideoCategories = async (videoId: string): Promise<VideoCategor
     })
     .filter((c): c is VideoCategory => Boolean(c?.id && c?.name));
 };
+
+export type VideoSort = "recent" | "viewed" | "rated";
+
+const sortToOrder = (sort: VideoSort): { col: string; ascending: boolean } => {
+  switch (sort) {
+    case "viewed":
+      return { col: "views", ascending: false };
+    case "rated":
+      return { col: "rating", ascending: false };
+    default:
+      return { col: "created_at", ascending: false };
+  }
+};
+
+export interface CategoryVideosResult {
+  category: { id: string; name: string; slug: string } | null;
+  videos: VideoRecord[];
+}
+
+/**
+ * Fetches videos for a category. Tries the `get-videos-by-category` edge function
+ * first; if unavailable, falls back to a direct join query.
+ */
+export const getVideosByCategory = async (
+  slug: string,
+  sort: VideoSort = "recent",
+): Promise<CategoryVideosResult> => {
+  const client = ensureSupabase();
+
+  // 1) Preferred path: edge function
+  try {
+    const { data, error } = await client.functions.invoke("get-videos-by-category", {
+      body: { slug, sort },
+    });
+    if (!error && data) {
+      const payload = data as {
+        category?: { id: string; name: string; slug: string } | null;
+        videos?: VideoRecord[];
+      };
+      if (Array.isArray(payload.videos)) {
+        return {
+          category: payload.category ?? null,
+          videos: payload.videos,
+        };
+      }
+    }
+  } catch {
+    // fall through to fallback
+  }
+
+  // 2) Fallback: direct query
+  const { data: cat, error: catErr } = await client
+    .from("categories")
+    .select("id,name,slug")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (catErr) throw new Error(catErr.message);
+  if (!cat) return { category: null, videos: [] };
+
+  const order = sortToOrder(sort);
+  const { data: rows, error: vErr } = await client
+    .from("video_categories")
+    .select(
+      "videos:video_id ( id,title,slug,bunny_video_id,status,playback_url,thumbnail_url,duration_seconds,views,rating,created_at )",
+    )
+    .eq("category_id", cat.id);
+  if (vErr) throw new Error(vErr.message);
+
+  const videos = ((rows ?? []) as Array<{ videos: VideoRecord | VideoRecord[] | null }>)
+    .flatMap((r) => {
+      const v = r.videos;
+      if (!v) return [];
+      return Array.isArray(v) ? v : [v];
+    })
+    .filter((v): v is VideoRecord => Boolean(v?.id) && v.status === "ready")
+    .sort((a, b) => {
+      const av = (a as unknown as Record<string, unknown>)[order.col];
+      const bv = (b as unknown as Record<string, unknown>)[order.col];
+      if (typeof av === "number" && typeof bv === "number") return bv - av;
+      return String(bv ?? "").localeCompare(String(av ?? ""));
+    });
+
+  return {
+    category: cat as { id: string; name: string; slug: string },
+    videos,
+  };
+};

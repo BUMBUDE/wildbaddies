@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Volume2, VolumeX, Settings, Maximize } from "lucide-react";
 import Hls from "hls.js";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const formatTime = (s: number) => {
   if (!isFinite(s)) return "0:00";
@@ -27,6 +28,9 @@ const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => 
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+  const [levels, setLevels] = useState<Array<{ index: number; height: number }>>([]);
+  const [currentLevel, setCurrentLevel] = useState<number>(-1);
+  const [qualityOpen, setQualityOpen] = useState(false);
 
   // Reload video when URL changes (HLS-aware)
   useEffect(() => {
@@ -37,6 +41,8 @@ const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => 
     setStarted(false);
     setCurrent(0);
     setDuration(0);
+    setLevels([]);
+    setCurrentLevel(-1);
     firstPlayFiredRef.current = false;
 
     // Cleanup any prior hls instance
@@ -58,6 +64,17 @@ const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => 
       hlsRef.current = hls;
       hls.loadSource(videoUrl);
       hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const parsed = hls.levels
+          .map((l, index) => ({ index, height: l.height ?? 0 }))
+          .filter((l) => l.height > 0)
+          .sort((a, b) => b.height - a.height);
+        setLevels(parsed);
+        setCurrentLevel(hls.currentLevel);
+      });
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+        setCurrentLevel(hls.autoLevelEnabled ? -1 : data.level);
+      });
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (!data.fatal) return;
         switch (data.type) {
@@ -151,6 +168,20 @@ const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => 
     else c.requestFullscreen?.();
   };
 
+  const setQuality = (idx: number) => {
+    const hls = hlsRef.current;
+    if (hls) {
+      hls.currentLevel = idx;
+      setCurrentLevel(idx);
+    }
+    setQualityOpen(false);
+  };
+
+  const activeHeight =
+    currentLevel >= 0 ? levels.find((l) => l.index === currentLevel)?.height ?? 0 : 0;
+  const qualityLabel = currentLevel === -1 ? "Auto" : `${activeHeight}p`;
+  const showQuality = levels.length > 1;
+
   const progress = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
@@ -211,9 +242,60 @@ const VideoPlayer = ({ videoUrl, posterUrl, onFirstPlay }: VideoPlayerProps) => 
             <div className="hidden sm:block w-20">
               <Slider value={[muted ? 0 : volume * 100]} onValueChange={onVol} max={100} step={1} />
             </div>
-            <button aria-label="Settings" className="hover:text-primary transition-colors">
-              <Settings className="h-5 w-5" />
-            </button>
+            {showQuality ? (
+              <Popover open={qualityOpen} onOpenChange={setQualityOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    aria-label="Quality settings"
+                    className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span className="hidden sm:inline text-xs font-bold">{qualityLabel}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="end"
+                  sideOffset={8}
+                  className="w-36 p-1 bg-card border-border"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setQuality(-1)}
+                    className={`flex w-full items-center justify-between rounded px-3 py-2 text-sm font-bold transition ${
+                      currentLevel === -1
+                        ? "bg-gradient-purple text-primary-foreground"
+                        : "text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    <span>Auto</span>
+                  </button>
+                  {levels.map((l) => (
+                    <button
+                      key={l.index}
+                      type="button"
+                      onClick={() => setQuality(l.index)}
+                      className={`flex w-full items-center justify-between rounded px-3 py-2 text-sm font-bold transition ${
+                        currentLevel === l.index
+                          ? "bg-gradient-purple text-primary-foreground"
+                          : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <span>{l.height}p</span>
+                      {l.height >= 720 && (
+                        <span className="ml-2 rounded bg-primary/80 px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary-foreground">
+                          HD
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <button aria-label="Settings" className="hover:text-primary transition-colors">
+                <Settings className="h-5 w-5" />
+              </button>
+            )}
             <button onClick={fullscreen} aria-label="Fullscreen" className="hover:text-primary transition-colors">
               <Maximize className="h-5 w-5" />
             </button>
