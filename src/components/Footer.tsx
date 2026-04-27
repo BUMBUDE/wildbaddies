@@ -1,7 +1,19 @@
+import { Link } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
 
-const primaryLinks = ["Videos", "Categories", "Tags"];
-const secondaryLinks = ["Support", "Privacy Policy", "DMCA", "Legal",];
+const primaryLinks: { label: string; to: string }[] = [
+  { label: "Videos", to: "/" },
+  { label: "Categories", to: "/categories" },
+  { label: "Tags", to: "/" },
+];
+
+const secondaryLinks: { label: string; to: string }[] = [
+  { label: "Support", to: "/" },
+  { label: "Privacy Policy", to: "/privacy-policy" },
+  { label: "DMCA", to: "/dmca" },
+  { label: "Legal", to: "/terms-of-service" },
+  { label: "18 U.S.C. 2257", to: "/2257" },
+];
 
 const Footer = () => {
   return (
@@ -28,17 +40,17 @@ const Footer = () => {
 
         <nav className="flex flex-wrap justify-center gap-6 text-white font-bold tracking-wider">
           {primaryLinks.map((l) => (
-            <a key={l} href="#" className="hover:text-primary transition-colors">
-              {l.toUpperCase()}
-            </a>
+            <Link key={l.label} to={l.to} className="hover:text-primary transition-colors">
+              {l.label.toUpperCase()}
+            </Link>
           ))}
         </nav>
 
         <nav className="flex flex-wrap justify-center gap-6 text-muted-foreground font-bold tracking-wider text-sm">
           {secondaryLinks.map((l) => (
-            <a key={l} href="#" className="hover:text-primary transition-colors">
-              {l.toUpperCase()}
-            </a>
+            <Link key={l.label} to={l.to} className="hover:text-primary transition-colors">
+              {l.label.toUpperCase()}
+            </Link>
           ))}
         </nav>
 
