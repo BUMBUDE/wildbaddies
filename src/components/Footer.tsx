@@ -1,7 +1,7 @@
 import mascot from "@/assets/baddies-mascot.png";
 
 const primaryLinks = ["Videos", "Categories", "Tags"];
-const secondaryLinks = ["Users", "Partners", "Support", "DMCA", "Legal", "Advertise"];
+const secondaryLinks = ["Support", "Privacy Policy", "DMCA", "Legal",];
 
 const Footer = () => {
   return (
