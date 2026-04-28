@@ -38,7 +38,7 @@ const AgeGate = () => {
           </span>
         </div>
 
-        <h1 className="mt-6 text-2xl sm:text-4xl font-bold uppercase text-foreground text-glow">
+        <h1 className="mt-6 text-2xl sm:text-4xl font-bold uppercase text-foreground">
           This is an adult website
         </h1>
 
@@ -62,7 +62,7 @@ const AgeGate = () => {
           <button
             type="button"
             onClick={enter}
-            className="rounded-md bg-gradient-purple px-5 py-3 text-sm sm:text-base font-bold text-primary-foreground btn-glow hover:opacity-95 transition"
+            className="rounded-md bg-gradient-purple px-5 py-3 text-sm sm:text-base font-bold text-primary-foreground transition"
           >
             I am 18 or older — Enter
           </button>
