@@ -15,33 +15,38 @@ import DmcaPage from "./pages/DmcaPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import Compliance2257Page from "./pages/Compliance2257Page";
 import JuicyPopunder from "./components/JuicyPopunder.tsx";
+import ProfilePage from "./pages/ProfilePage.tsx";
+import { AuthProvider } from "./context/AuthContext";
 
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AgeGate />
-      <BrowserRouter>
-      <JuicyPopunder />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/video/:slug" element={<VideoPage />} />
-          <Route path="/upload" element={<UploadPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/categories/:slug" element={<CategoryVideosPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/dmca" element={<DmcaPage />} />
-          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
-          <Route path="/2257" element={<Compliance2257Page />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AgeGate />
+        <BrowserRouter>
+        <JuicyPopunder />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/video/:slug" element={<VideoPage />} />
+            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/categories/:slug" element={<CategoryVideosPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/dmca" element={<DmcaPage />} />
+            <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+            <Route path="/2257" element={<Compliance2257Page />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
