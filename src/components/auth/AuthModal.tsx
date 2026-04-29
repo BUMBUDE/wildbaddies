@@ -62,14 +62,14 @@ const LoginForm = ({
   onDone: () => void;
 }) => {
   const { login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   return (
   <form
     className="space-y-5"
     onSubmit={(e) => {
       e.preventDefault();
-      if (!username.trim()) return;
-      login(username.trim());
+      if (!email.trim()) return;
+      login(email.trim());
       onDone();
     }}
   >
@@ -78,14 +78,14 @@ const LoginForm = ({
     </h2>
 
     <div>
-      <label htmlFor="login-username" className={labelCls}>
-        Username<span className="text-primary">*</span>
+      <label htmlFor="login-email" className={labelCls}>
+        Email<span className="text-primary">*</span>
       </label>
       <input
         id="login-username"
         type="text"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className={inputCls}
       />
     </div>
