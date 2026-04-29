@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Search, Menu, X, User, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import AuthModal, { type AuthMode } from "@/components/auth/AuthModal";
 
 const navItems: { label: string; href: string }[] = [
   { label: "Videos", href: "/" },
@@ -12,6 +14,15 @@ const navItems: { label: string; href: string }[] = [
 
 const Header = () => {
   const [open, setOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  const openAuth = (mode: AuthMode) => {
+    setAuthMode(mode);
+    setAccountOpen(false);
+    setAuthOpen(true);
+  };
 
   return (
     <header className="relative z-30 bg-gradient-header border-b border-primary/20">
@@ -42,12 +53,36 @@ const Header = () => {
 
         {/* Right actions */}
         <div className="flex items-center gap-3">
-          <button
-            aria-label="Account"
-            className="h-10 w-10 rounded-full bg-gradient-purple grid place-items-center  transition-shadow"
-          >
-            <User className="h-5 w-5 text-white" />
-          </button>
+          <Popover open={accountOpen} onOpenChange={setAccountOpen}>
+            <PopoverTrigger asChild>
+              <button
+                aria-label="Account"
+                className="h-10 w-10 rounded-full bg-gradient-purple grid place-items-center transition-shadow hover:opacity-95"
+              >
+                <User className="h-5 w-5 text-white" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={8}
+              className="w-44 p-2 bg-card border-border"
+            >
+              <button
+                type="button"
+                onClick={() => openAuth("login")}
+                className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+              >
+                Log In
+              </button>
+              <button
+                type="button"
+                onClick={() => openAuth("signup")}
+                className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+              >
+                Sign Up
+              </button>
+            </PopoverContent>
+          </Popover>
           <button
             aria-label="Toggle menu"
             onClick={() => setOpen((v) => !v)}
@@ -96,6 +131,13 @@ const Header = () => {
           </ul>
         </nav>
       )}
+
+      <AuthModal
+        open={authOpen}
+        mode={authMode}
+        onOpenChange={setAuthOpen}
+        onSwitchMode={setAuthMode}
+      />
     </header>
   );
 };
