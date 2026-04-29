@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Search, Menu, X, User, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import AuthModal, { type AuthMode } from "@/components/auth/AuthModal";
+import { useAuth } from "@/context/AuthContext";
 
 const navItems: { label: string; href: string }[] = [
   { label: "Videos", href: "/" },
@@ -17,11 +18,24 @@ const Header = () => {
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [accountOpen, setAccountOpen] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const openAuth = (mode: AuthMode) => {
     setAuthMode(mode);
     setAccountOpen(false);
     setAuthOpen(true);
+  };
+
+  const goTo = (path: string) => {
+    setAccountOpen(false);
+    navigate(path);
+  };
+
+  const handleLogout = () => {
+    setAccountOpen(false);
+    logout();
+    navigate("/");
   };
 
   return (
@@ -57,9 +71,17 @@ const Header = () => {
             <PopoverTrigger asChild>
               <button
                 aria-label="Account"
-                className="h-10 w-10 rounded-full bg-gradient-purple grid place-items-center transition-shadow hover:opacity-95"
+                className="h-10 w-10 rounded-full bg-gradient-purple grid place-items-center overflow-hidden transition-shadow hover:opacity-95"
               >
-                <User className="h-5 w-5 text-white" />
+                {isAuthenticated ? (
+                  <img
+                    src={user?.avatarUrl || mascot}
+                    alt={user?.username || "Account"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User className="h-5 w-5 text-white" />
+                )}
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -67,20 +89,48 @@ const Header = () => {
               sideOffset={8}
               className="w-44 p-2 bg-card border-border"
             >
-              <button
-                type="button"
-                onClick={() => openAuth("login")}
-                className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                onClick={() => openAuth("signup")}
-                className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
-              >
-                Sign Up
-              </button>
+              {isAuthenticated ? (
+                <div className="flex flex-col items-stretch text-center">
+                  <button
+                    type="button"
+                    onClick={() => goTo("/profile")}
+                    className="px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goTo("/profile")}
+                    className="px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+                  >
+                    Messages
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openAuth("login")}
+                    className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+                  >
+                    Log In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAuth("signup")}
+                    className="w-full text-left px-3 py-2 rounded-md text-sm font-extrabold tracking-widest uppercase text-white hover:bg-secondary transition-colors"
+                  >
+                    Sign Up
+                  </button>
+                </>
+              )}
             </PopoverContent>
           </Popover>
           <button

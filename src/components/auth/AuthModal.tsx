@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 export type AuthMode = "login" | "signup";
 
@@ -53,11 +54,23 @@ const SubmitButton = ({ children }: { children: React.ReactNode }) => (
   </button>
 );
 
-const LoginForm = ({ onSwitch }: { onSwitch: () => void }) => (
+const LoginForm = ({
+  onSwitch,
+  onDone,
+}: {
+  onSwitch: () => void;
+  onDone: () => void;
+}) => {
+  const { login } = useAuth();
+  const [username, setUsername] = useState("");
+  return (
   <form
     className="space-y-5"
     onSubmit={(e) => {
       e.preventDefault();
+      if (!username.trim()) return;
+      login(username.trim());
+      onDone();
     }}
   >
     <h2 className="text-2xl font-extrabold tracking-wider text-white uppercase">
@@ -68,7 +81,13 @@ const LoginForm = ({ onSwitch }: { onSwitch: () => void }) => (
       <label htmlFor="login-username" className={labelCls}>
         Username<span className="text-primary">*</span>
       </label>
-      <input id="login-username" type="text" className={inputCls} />
+      <input
+        id="login-username"
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        className={inputCls}
+      />
     </div>
 
     <div>
@@ -108,13 +127,27 @@ const LoginForm = ({ onSwitch }: { onSwitch: () => void }) => (
       </button>
     </p>
   </form>
-);
+  );
+};
 
-const SignupForm = ({ onSwitch }: { onSwitch: () => void }) => (
+const SignupForm = ({
+  onSwitch,
+  onDone,
+}: {
+  onSwitch: () => void;
+  onDone: () => void;
+}) => {
+  const { signup } = useAuth();
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  return (
   <form
     className="space-y-5"
     onSubmit={(e) => {
       e.preventDefault();
+      if (!username.trim()) return;
+      signup(username.trim(), email.trim() || undefined);
+      onDone();
     }}
   >
     <h2 className="text-2xl font-extrabold tracking-wider text-white uppercase">
@@ -129,6 +162,8 @@ const SignupForm = ({ onSwitch }: { onSwitch: () => void }) => (
         id="signup-username"
         type="text"
         placeholder="Enter your desired username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
         className={inputCls}
       />
     </div>
@@ -141,6 +176,8 @@ const SignupForm = ({ onSwitch }: { onSwitch: () => void }) => (
         id="signup-email"
         type="email"
         placeholder="Enter your email address"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className={inputCls}
       />
     </div>
@@ -191,7 +228,8 @@ const SignupForm = ({ onSwitch }: { onSwitch: () => void }) => (
       </a>
     </div>
   </form>
-);
+  );
+};
 
 const AuthModal = ({ open, mode, onOpenChange, onSwitchMode }: AuthModalProps) => {
   return (
@@ -210,9 +248,15 @@ const AuthModal = ({ open, mode, onOpenChange, onSwitchMode }: AuthModalProps) =
 
         <div className="max-h-[85vh] overflow-y-auto p-6 sm:p-8">
           {mode === "login" ? (
-            <LoginForm onSwitch={() => onSwitchMode("signup")} />
+            <LoginForm
+              onSwitch={() => onSwitchMode("signup")}
+              onDone={() => onOpenChange(false)}
+            />
           ) : (
-            <SignupForm onSwitch={() => onSwitchMode("login")} />
+            <SignupForm
+              onSwitch={() => onSwitchMode("login")}
+              onDone={() => onOpenChange(false)}
+            />
           )}
         </div>
       </DialogContent>
