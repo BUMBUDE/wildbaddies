@@ -319,7 +319,7 @@ const FeaturedVideos = () => {
                 onClick={() => goTo(p as number)}
                 className={`h-9 w-9 rounded-full grid place-items-center font-bold transition ${
                   p === page
-                    ? "bg-gradient-purple text-white btn-glow"
+                    ? "bg-gradient-purple text-white"
                     : "text-white hover:text-primary"
                 }`}
               >

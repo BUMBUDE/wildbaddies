@@ -55,7 +55,7 @@ const PromotedModels = () => {
                   className="h-full w-full object-cover"
                 />
               </div>
-              <button className="inline-flex items-center justify-center gap-1.5 rounded-md bg-gradient-purple py-2 text-sm font-bold text-white btn-glow-soft hover:btn-glow transition">
+              <button className="inline-flex items-center justify-center gap-1.5 rounded-md bg-gradient-purple py-2 text-sm font-bold text-white transition">
                 <ArrowUpRight className="h-4 w-4" /> VIEW ONLYFANS
               </button>
               <p className="text-center text-sm font-bold text-white truncate px-1">
