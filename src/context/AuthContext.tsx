@@ -20,6 +20,12 @@ export interface AuthUser {
   avatarUrl?: string;
   role: UserRole;
   joinedAt: string;
+  rank?: number | string;
+  points?: number;
+  country?: string;
+  gender?: string;
+  relationship?: string;
+  orientation?: string;
 }
 
 interface AuthContextValue {
