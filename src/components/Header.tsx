@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Search, Menu, X, User, Upload } from "lucide-react";
+import { Menu, X, User, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import mascot from "@/assets/baddies-mascot.png";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import AuthModal, { type AuthMode } from "@/components/auth/AuthModal";
 import { useAuth } from "@/context/AuthContext";
+import SearchBox from "@/components/search/SearchBox";
 
 const navItems: { label: string; href: string }[] = [
   { label: "Videos", href: "/" },
@@ -56,14 +57,7 @@ const Header = () => {
         </Link>
 
         {/* Search (desktop) */}
-        <div className="hidden md:flex flex-1 max-w-md items-center gap-2 text-muted-foreground">
-          <Search className="h-5 w-5" />
-          <input
-            type="search"
-            placeholder="SEARCH"
-            className="w-full bg-transparent border-none outline-none text-base font-bold tracking-wider placeholder:text-muted-foreground"
-          />
-        </div>
+        <SearchBox className="hidden md:block flex-1 max-w-md" />
 
         {/* Right actions */}
         <div className="flex items-center gap-3">
@@ -144,13 +138,8 @@ const Header = () => {
       </div>
 
       {/* Mobile search */}
-      <div className="container md:hidden pb-3 flex items-center gap-2 text-muted-foreground">
-        <Search className="h-5 w-5" />
-        <input
-          type="search"
-          placeholder="SEARCH"
-          className="w-full bg-transparent border-none outline-none text-base font-bold tracking-wider placeholder:text-muted-foreground"
-        />
+      <div className="container md:hidden pb-3">
+        <SearchBox />
       </div>
 
       {/* Slide-down menu */}
