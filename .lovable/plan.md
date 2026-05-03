@@ -1,76 +1,89 @@
-## Task 1 — Legal Pages
+# Search Functionality Plan
 
-Create 4 legal pages, all using `Header` + `Footer` and a shared layout look matching the uploaded screenshots (dark bg, purple left-bar accent on title, white-glow heading, body in muted text).
+## Task 1 — Header Search with Suggestion Dropdown
 
-**New shared component:** `src/components/legal/LegalLayout.tsx`
-- Props: `title`, `children`
-- Renders: page title with purple `border-l-4 border-primary pl-4` accent + section heading style + `prose`-like spacing for paragraphs.
+### 1. `src/lib/videos.ts` — add suggestion helper
+Add a new function (no edge function needed — calls the existing `list-videos` function with `q` and a small limit, or queries `videos` table directly via Supabase). To stay consistent with the rest of the app (which already uses `list-videos`), use the edge function:
 
-**New pages:**
-1. `src/pages/PrivacyPolicyPage.tsx` → `/privacy-policy`  
-   Standard adult-site privacy policy: data we collect (cookies, IP, analytics), how we use it, third parties (Bunny CDN, Supabase), cookies, user rights (GDPR/CCPA), contact.
-2. `src/pages/DmcaPage.tsx` → `/dmca`  
-   Content modeled on the second uploaded screenshot: Legal Disclaimer, How to File a DMCA Notice (required elements), Counter-Notification Procedures, Repeat Infringer Policy, contact email.
-3. `src/pages/TermsOfServicePage.tsx` → `/terms-of-service`  
-   Sections: Eligibility (must be 18+), Account responsibility, Acceptable Use (no illegal content, no copyright violations, no scraping/automated abuse, no harassment), Content ownership & license, Termination, Disclaimers, Governing Law.
-4. `src/pages/Compliance2257Page.tsx` → `/2257`  
-   Content modeled on the first uploaded screenshot — 18 U.S.C. 2257 Record-Keeping Requirements Compliance Statement.
+```ts
+export interface VideoSuggestion {
+  id: string; title: string; slug: string; thumbnail_url: string | null;
+}
 
-**Routing — `src/App.tsx`:** add 4 routes above the `*` catch-all.
+export const searchVideoSuggestions = async (
+  query: string, limit = 6, signal?: AbortSignal
+): Promise<VideoSuggestion[]> => {
+  const q = query.trim();
+  if (!q) return [];
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-videos`
+            + `?q=${encodeURIComponent(q)}&limit=${limit}&status=ready`;
+  const res = await fetch(url, {
+    signal,
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.videos ?? []).map((v: any) => ({
+    id: v.id, title: v.title, slug: v.slug, thumbnail_url: v.thumbnail_url,
+  }));
+};
+```
 
-**Footer — `src/components/Footer.tsx`:** wire `secondaryLinks` to real `<Link>`s:
-- Privacy Policy → `/privacy-policy`
-- DMCA → `/dmca`
-- Legal → `/terms-of-service`
-- Add a "18 U.S.C. 2257" link → `/2257`
-- Replace anchor tags with react-router `Link` so navigation is SPA.
+### 2. New component `src/components/search/SearchBox.tsx`
+Replaces the static `<input>` in `Header.tsx` (both desktop and mobile).
 
----
+Features:
+- Local state: `query`, `debouncedQuery`, `suggestions`, `loading`, `open`, `activeIndex`.
+- **Debounce 300ms** via `useEffect` + `setTimeout` on `query`.
+- Fetch suggestions for `debouncedQuery` (>= 2 chars) using `searchVideoSuggestions`. Use `AbortController` to cancel stale requests.
+- Dropdown panel (absolute positioned below input):
+  - Loading → 3 skeleton rows
+  - Empty (and query present) → "No results"
+  - Results → list of items showing thumbnail + title; clicking navigates to `/video/{slug}`.
+  - Footer row: "See all results for '<query>'" → navigates to `/search?q=<query>`.
+- Keyboard support: ArrowUp/Down to move `activeIndex`, Enter to navigate (selected item, or fall back to search page), Esc to close.
+- Outside-click closes dropdown (use a ref + `mousedown` listener).
+- Submitting (Enter with no active item) → `navigate('/search?q=' + encodeURIComponent(query))`.
+- Brand styling: same transparent input look already in `Header`, dropdown uses `bg-card border-border` with rounded corners and shadow, matching popover styling.
+- Responsive: full-width on mobile, max-w-md on desktop.
 
-## Task 2 — Home Categories Filter + Skeleton
+### 3. `src/components/Header.tsx`
+- Replace both desktop (`<div class="hidden md:flex flex-1 max-w-md ...">`) and mobile search blocks with `<SearchBox />`.
 
-Edit `src/components/FeaturedVideos.tsx`:
+## Task 2 — Search Results Page
 
-**State**
-- Add `selectedCategory: string` (default `"all"`, stores slug; `"all"` means no filter).
-- Add `expanded: boolean` (default `false`) — controls collapsed (first row only) vs full list.
+### 4. New page `src/pages/SearchPage.tsx`
+- Reads `q` from URL via `useSearchParams`.
+- Local state for `page`, `limit`, `sort` (reuse the same options as `FeaturedVideos`).
+- Uses `useQuery` keyed on `["videos","search",q,page,limit,sort]`.
+- Fetcher calls the edge function:
+  ```
+  ${SUPABASE_URL}/functions/v1/list-videos?q=...&page=...&limit=...&sort=...&status=ready
+  ```
+  with the same `apikey` header pattern already used in `FeaturedVideos.tsx`.
+- Layout:
+  - `Header` + `Footer` like `Index`.
+  - Title: `Search results for "<q>"` + total count.
+  - Sort + per-page selectors (reuse `SORT_OPTIONS` / `SHOW_OPTIONS`, can extract to `src/lib/listVideosOptions.ts` to share — optional refactor).
+  - Grid of `VideoCard` (same grid classes as `FeaturedVideos`).
+  - Skeleton UI (`VideoCardSkeleton` × limit) while loading — matches existing pattern.
+  - Empty state when no results.
+  - Pagination UI reusing the `getPageWindow` helper (could be extracted to `src/lib/pagination.ts`; if not extracted, duplicate inline).
+- Updating the search box re-submits → updates `?q=` and resets `page` to 1.
 
-**Categories source**
-- Replace the hardcoded `CATEGORY_CHIPS` array with a live `useQuery(['categories'], listCategories)` call (`src/lib/categories.ts` already exists). Keep "All" as a synthetic first chip (UI-only, not in DB).
-- Show a skeleton row (8 chip-shaped Skeletons) while categories are loading.
+### 5. `src/App.tsx`
+- Add route: `<Route path="/search" element={<SearchPage />} />`.
 
-**Chip behavior**
-- Clicking a chip sets `selectedCategory` and resets `page` to 1.
-- Active chip: `bg-gradient-purple text-white btn-glow`; inactive uses existing `chip` class.
-- Collapsed mode: render only the first ~8 chips (plus "All"); show `"Show All Categories"` toggle.
-- Expanded mode: render all chips; toggle now reads `"Hide Categories"`.
+## UX Fixes
+- Don't fetch suggestions for queries shorter than 2 chars.
+- Cancel in-flight fetch on each new keystroke (AbortController).
+- Close dropdown after navigation.
+- Pressing Enter with empty input → no-op.
+- Clear `activeIndex` whenever suggestions change.
 
-**Data fetching**
-- When `selectedCategory === "all"`: keep existing `fetchVideos(page, limit, sort)` call against `list-videos` edge function.
-- When a specific category is selected: call `getVideosByCategory(slug, sort)` from `src/lib/videos.ts` (already implemented). Map its `VideoRecord[]` into the same shape `VideoCard` consumes. For the category branch, paginate client-side (slice by `page`/`limit`) and compute `totalCount`/`totalPages` locally so the existing pagination UI still works.
-- Use a single `useQuery` whose `queryKey` includes `selectedCategory` so cache is keyed correctly.
-
-**Skeleton UI for videos**
-- Replace `"Loading videos…"` text with a grid of `VideoCardSkeleton` items (count = `limit`, capped at e.g. 12 for first paint).
-- New component `src/components/VideoCardSkeleton.tsx`:
-  - `aspect-video Skeleton` for thumbnail
-  - `h-4 w-3/4` Skeleton for title (centered)
-  - Two small Skeletons in a row for views/rating
-- Show skeletons when `isLoading` is true (initial fetch, no cached data). On `isFetching` with prior data, keep the existing 50% opacity behavior.
-
----
-
-## Files
-
-**Create**
-- `src/components/legal/LegalLayout.tsx`
-- `src/pages/PrivacyPolicyPage.tsx`
-- `src/pages/DmcaPage.tsx`
-- `src/pages/TermsOfServicePage.tsx`
-- `src/pages/Compliance2257Page.tsx`
-- `src/components/VideoCardSkeleton.tsx`
-
-**Edit**
-- `src/App.tsx` — register 4 legal routes
-- `src/components/Footer.tsx` — real links via `react-router-dom` `Link`, add 2257 link
-- `src/components/FeaturedVideos.tsx` — live categories, All/category filter, expand/collapse chips, skeleton loading state
+## Files Touched
+- Edit: `src/lib/videos.ts`, `src/components/Header.tsx`, `src/App.tsx`
+- Create: `src/components/search/SearchBox.tsx`, `src/pages/SearchPage.tsx`
