@@ -165,6 +165,60 @@ export const listVideoCategories = async (videoId: string): Promise<VideoCategor
 
 export type VideoSort = "recent" | "viewed" | "rated";
 
+// ─── Search suggestions ────────────────────────────────────────────────────
+export interface VideoSuggestion {
+  id: string;
+  title: string;
+  slug: string;
+  thumbnail_url: string | null;
+}
+
+/**
+ * Lightweight autocomplete suggestions backed by the `list-videos` edge
+ * function `q` parameter. Returns `[]` for empty queries or any failure.
+ */
+export const searchVideoSuggestions = async (
+  query: string,
+  limit = 6,
+  signal?: AbortSignal,
+): Promise<VideoSuggestion[]> => {
+  const q = query.trim();
+  if (!q) return [];
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!supabaseUrl || !supabaseAnonKey) return [];
+
+  const params = new URLSearchParams({
+    q,
+    limit: String(limit),
+    status: "ready",
+    page: "1",
+    sort: "newest",
+  });
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/list-videos?${params}`, {
+      signal,
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { videos?: Array<Record<string, unknown>> };
+    return (data.videos ?? []).map((v) => ({
+      id: String(v.id),
+      title: String(v.title ?? ""),
+      slug: String(v.slug ?? ""),
+      thumbnail_url: (v.thumbnail_url as string | null) ?? null,
+    }));
+  } catch {
+    return [];
+  }
+};
+
 const sortToOrder = (sort: VideoSort): { col: string; ascending: boolean } => {
   switch (sort) {
     case "viewed":
